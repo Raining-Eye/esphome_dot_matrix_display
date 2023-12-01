@@ -1,0 +1,126 @@
+esphome:
+  name: dot_matrix
+  friendly_name: dot_matrix
+
+# Replace with your board info
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+logger:
+
+api:
+  encryption:
+    key: "YOUR ENCRYPTION KEY"
+
+ota:
+  password: "YOUR OTA PASSWORD"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+number:
+  - platform: template
+    name: $friendly_name Brightness
+    id: brightness
+    optimistic: true
+    initial_value: 1
+    min_value: 0
+    max_value: 15
+    step: 1
+
+text_sensor:
+  - platform: homeassistant
+    name: "Media Artist"
+    id: media_artist
+    entity_id: media_player.spotify_USERNAME
+    attribute: media_artist
+  - platform: homeassistant
+    name: "Media Title"
+    id: media_title
+    entity_id: media_player.spotify_USERNAME
+    attribute: media_title
+  - platform: homeassistant
+    name: "Spotify"
+    id: spotify_state
+    entity_id: media_player.spotify_USERNAME
+
+switch:
+  - platform: template
+    name: $friendly_name Power
+    id: power
+    optimistic: true
+    restore_mode: ALWAYS_ON
+
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+
+# Set GPIO pins
+spi:
+  clk_pin: GPIO18
+  mosi_pin: GPIO23
+
+display:
+  - platform: max7219digit
+    cs_pin: GPIO5
+    num_chips: 8
+    num_chip_lines: 2
+    scroll_mode: stop
+    scroll_delay: 2s
+    scroll_dwell: 2s
+    scroll_speed: 30ms
+    intensity: 1
+    lambda: |-
+      if(id(power).state) {
+        it.intensity(id(brightness).state);
+      } else {
+        it.intensity(0);
+      }
+      if(id(spotify_state).state == "playing" || id(spotify_state).state == "paused") {
+        it.scroll(true, max7219digit::STOP, 30, 2000, 2000);
+        it.printf(0, 0, id(digit_font), "%s", id(media_artist).state.c_str());
+        it.printf(0, 8, id(digit_font), "%s", id(media_title).state.c_str());
+      } else {
+        it.scroll(false);
+        it.strftime(-1, -1, id(clock_font), TextAlign::TOP_LEFT, "%I", id(homeassistant_time).now());
+        it.strftime(33, -1, id(clock_font), TextAlign::TOP_RIGHT, "%M", id(homeassistant_time).now());
+        if(id(homeassistant_time).now().second % 2 == 0) {
+          it.filled_rectangle(15, 5, 2, 2);
+        } else {
+          it.filled_rectangle(15, 9, 2, 2);
+        }
+        switch(id(homeassistant_time).now().day_of_week) {
+          case 2:
+            it.line(2, 15, 5, 15);
+            break;
+          case 3:
+            it.line(6, 15, 9, 15);
+            break;
+          case 4:
+            it.line(10, 15, 13, 15);
+            break;
+          case 5:
+            it.line(14, 15, 17, 15);
+            break;
+          case 6:
+            it.line(18, 15, 21, 15);
+            break;
+          case 7:
+            it.line(22, 15, 25, 15);
+            break;
+          case 1:
+            it.line(26, 15, 29, 15);
+            break;
+        }
+      }
+
+font:
+  - file: "fonts/pixelmix.ttf"
+    id: digit_font
+    size: 8
+  - file: "fonts/Unifontexmono-AL3RA.ttf"
+    id: clock_font
+    size: 16
